@@ -1,0 +1,372 @@
+/* ----------------------------------------------------------------------------
+ * Meld — git history viewer
+ * Dark, compact dev-tool aesthetic. Vanilla CSS, no external assets.
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --bg: #0d1117;
+  --bg-pane: #0d1117;
+  --bg-elev: #161b22;
+  --bg-hover: #1c2333;
+  --bg-sel: #1f6feb33;
+  --border: #21262d;
+  --border-strong: #30363d;
+  --text: #c9d1d9;
+  --text-dim: #8b949e;
+  --text-faint: #6e7681;
+  --accent: #1f6feb;
+
+  --add-bg: #12331f;
+  --add-fg: #7ee787;
+  --del-bg: #3a1418;
+  --del-fg: #ff7b72;
+  --hunk-fg: #79c0ff;
+
+  --st-add: #2ea043;
+  --st-mod: #d29922;
+  --st-del: #da3633;
+  --st-ren: #1f6feb;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: var(--mono); }
+
+/* ---- Layout --------------------------------------------------------------- */
+
+.app {
+  display: grid;
+  grid-template-columns: 240px 360px 1fr;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-pane);
+}
+.pane-detail { border-right: none; }
+
+.pane-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.pane-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-subtitle {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pane-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+.placeholder {
+  padding: 16px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ---- Branches ------------------------------------------------------------- */
+
+.branch-group { padding: 6px 0; }
+
+.group-label {
+  padding: 8px 14px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.branch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.branch-row:hover { background: var(--bg-hover); }
+.branch-row.selected {
+  background: var(--bg-sel);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.branch-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Badges --------------------------------------------------------------- */
+
+.badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 3px;
+  color: #fff;
+}
+.badge-head {
+  padding: 2px 5px;
+  background: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.status-A { padding: 2px 6px; background: var(--st-add); }
+.status-M { padding: 2px 6px; background: var(--st-mod); color: #1a1500; }
+.status-D { padding: 2px 6px; background: var(--st-del); }
+.status-R { padding: 2px 6px; background: var(--st-ren); }
+.status-x { padding: 2px 6px; background: var(--text-faint); }
+
+/* ---- Commits -------------------------------------------------------------- */
+
+.commit-row {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.commit-row:hover { background: var(--bg-hover); }
+.commit-row.selected {
+  background: var(--bg-sel);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.commit-subject {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+}
+.commit-meta .sep { color: var(--text-faint); }
+.commit-sha { color: var(--hunk-fg); }
+.commit-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-date { flex: 0 0 auto; }
+
+.load-more {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 12px 14px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.load-more:hover:not(:disabled) { background: var(--bg-hover); }
+.load-more:disabled { opacity: 0.6; cursor: default; }
+
+/* ---- Detail --------------------------------------------------------------- */
+
+.detail-header {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-subject {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+.detail-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  font-size: 12px;
+}
+.detail-meta dt {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  padding-top: 1px;
+}
+.detail-meta dd {
+  margin: 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.detail-meta .meta-row { display: contents; }
+
+.detail-body {
+  margin: 14px 0 0;
+  padding: 12px;
+  border-radius: 5px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- Files & diffs -------------------------------------------------------- */
+
+.file-block {
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+.file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: var(--bg-elev);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.file-path {
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.binary-note {
+  padding: 10px 18px 14px;
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.diff {
+  margin: 0;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 4;
+}
+.diff-line {
+  display: block;
+  padding: 0 18px;
+  white-space: pre;
+}
+.diff-add { background: var(--add-bg); color: var(--add-fg); }
+.diff-del { background: var(--del-bg); color: var(--del-fg); }
+.diff-hunk { color: var(--hunk-fg); background: #161b2233; }
+.diff-meta { color: var(--text-faint); }
+.diff-ctx { color: var(--text-dim); }
+
+/* ---- Error banner --------------------------------------------------------- */
+
+.error-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 80vw;
+  padding: 10px 14px;
+  border: 1px solid var(--st-del);
+  border-radius: 6px;
+  background: #2d1416;
+  color: #ffb4ae;
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+.error-banner[hidden] { display: none; }
+.error-dismiss {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+/* ---- Scrollbars ----------------------------------------------------------- */
+
+.pane-body::-webkit-scrollbar,
+.diff::-webkit-scrollbar { width: 10px; height: 10px; }
+.pane-body::-webkit-scrollbar-thumb,
+.diff::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 2px solid var(--bg);
+}
+.pane-body::-webkit-scrollbar-track,
+.diff::-webkit-scrollbar-track { background: transparent; }

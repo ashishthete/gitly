@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meld — git history viewer</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="error-banner" class="error-banner" hidden>
+    <span id="error-message"></span>
+    <button id="error-dismiss" class="error-dismiss" type="button" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <div class="app">
+    <!-- LEFT: branches -->
+    <aside class="pane pane-branches">
+      <header class="pane-header">
+        <span class="pane-title">Meld</span>
+        <span class="pane-subtitle">branches</span>
+      </header>
+      <div id="branches" class="pane-body" role="list">
+        <div class="placeholder">Loading…</div>
+      </div>
+    </aside>
+
+    <!-- MIDDLE: commits -->
+    <section class="pane pane-commits">
+      <header class="pane-header">
+        <span class="pane-title" id="commits-title">Commits</span>
+      </header>
+      <div id="commits" class="pane-body" role="list">
+        <div class="placeholder">Select a branch</div>
+      </div>
+    </section>
+
+    <!-- RIGHT: commit detail -->
+    <section class="pane pane-detail">
+      <header class="pane-header">
+        <span class="pane-title">Detail</span>
+      </header>
+      <div id="detail" class="pane-body">
+        <div class="placeholder">Select a commit</div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
