@@ -1,10 +1,10 @@
 {
-  "name": "meld-viewer",
+  "name": "gitly",
   "version": "0.1.0",
-  "description": "Read-only git history viewer for macOS",
+  "description": "Read-only git history, graph, and tree viewer for macOS",
   "type": "module",
   "bin": {
-    "meld": "bin/meld.js"
+    "gitly": "bin/meld.js"
   },
   "scripts": {
     "start": "node bin/meld.js",

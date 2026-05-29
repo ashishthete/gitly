@@ -1,23 +1,48 @@
-'use strict';
-
 /* ----------------------------------------------------------------------------
- * Meld — read-only git history viewer (frontend)
- * Vanilla JS, no dependencies, no build step.
+ * gitly — read-only git viewer (frontend shell, ES module)
+ *
+ * Owns the tab bar and three views:
+ *   - History    (branches | commit graph | detail)
+ *   - Full Graph (all-branches graph | detail)
+ *   - Repo Tree  (mounted by tree.js)
+ *
+ * Shared helpers come from util.js; the DAG graph from graph.js; the repo tree
+ * from tree.js. This module does NOT redefine any of those.
  * -------------------------------------------------------------------------- */
 
-const PAGE_LIMIT = 100;
+import {
+  el,
+  setPlaceholder,
+  fetchJson,
+  showError,
+  clearError,
+} from './util.js';
+import { renderCommitGraph, highlightCommit } from './graph.js';
+import { mountRepoTree } from './tree.js';
+import { mountBranchTree } from './branches.js';
+
+const HISTORY_LIMIT = 200;
+const FULL_LIMIT = 300;
 
 // ---- DOM refs --------------------------------------------------------------
-const branchesEl = document.getElementById('branches');
-const commitsEl = document.getElementById('commits');
-const commitsTitleEl = document.getElementById('commits-title');
-const detailEl = document.getElementById('detail');
-const errorBannerEl = document.getElementById('error-banner');
-const errorMessageEl = document.getElementById('error-message');
 const errorDismissEl = document.getElementById('error-dismiss');
 
+const branchesEl = document.getElementById('branches');
+const historyTitleEl = document.getElementById('history-title');
+const historyGraphEl = document.getElementById('history-graph');
+const historyDetailEl = document.getElementById('history-detail');
+
+const fullGraphEl = document.getElementById('full-graph');
+const fullDetailEl = document.getElementById('full-detail');
+
+const repoTreeEl = document.getElementById('repo-tree');
+const branchTreeEl = document.getElementById('branch-tree');
+
+const tabEls = Array.from(document.querySelectorAll('.tab[data-tab]'));
+const panelEls = Array.from(document.querySelectorAll('.tab-panel[data-tab]'));
+
 // ---- App state -------------------------------------------------------------
-const state = {
+const history = {
   selectedBranch: null,
   selectedSha: null,
   commits: [],
@@ -25,66 +50,63 @@ const state = {
   loadingMore: false,
 };
 
-// ---- Helpers ---------------------------------------------------------------
+const full = {
+  initialized: false,
+  selectedSha: null,
+  commits: [],
+  skip: 0,
+  loadingMore: false,
+};
 
-/** Escape arbitrary text for safe HTML insertion. */
-function escapeHtml(value) {
-  const str = value == null ? '' : String(value);
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const treeView = { initialized: false };
+const branchView = { initialized: false };
 
-/** Create an element with optional class, text, and attributes. */
-function el(tag, opts = {}) {
-  const node = document.createElement(tag);
-  if (opts.className) node.className = opts.className;
-  if (opts.text != null) node.textContent = opts.text;
-  if (opts.attrs) {
-    for (const [k, v] of Object.entries(opts.attrs)) node.setAttribute(k, v);
+let activeTab = 'history';
+
+// ---- Tab switching ---------------------------------------------------------
+
+function activateTab(name) {
+  if (activeTab === name && tabInitialized(name)) {
+    // already active; nothing to do
   }
-  return node;
-}
+  activeTab = name;
 
-function showError(message) {
-  errorMessageEl.textContent = message || 'Something went wrong.';
-  errorBannerEl.hidden = false;
-}
-
-function clearError() {
-  errorBannerEl.hidden = true;
-  errorMessageEl.textContent = '';
-}
-
-function setPlaceholder(container, text) {
-  container.replaceChildren(el('div', { className: 'placeholder', text }));
-}
-
-/** Fetch JSON from the API; throws Error with server-provided message. */
-async function fetchJson(url) {
-  let res;
-  try {
-    res = await fetch(url);
-  } catch (networkErr) {
-    throw new Error('Network error: ' + networkErr.message);
+  for (const tab of tabEls) {
+    const isActive = tab.dataset.tab === name;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   }
-  let data = null;
-  try {
-    data = await res.json();
-  } catch (_parseErr) {
-    data = null;
+  for (const panel of panelEls) {
+    const isActive = panel.dataset.tab === name;
+    panel.classList.toggle('active', isActive);
+    panel.hidden = !isActive;
   }
-  if (!res.ok) {
-    const msg = data && data.error ? data.error : `Request failed (${res.status})`;
-    throw new Error(msg);
+
+  // Lazy init on first activation.
+  if (name === 'full' && !full.initialized) {
+    full.initialized = true;
+    loadFullGraph(/* reset */ true);
+  } else if (name === 'tree' && !treeView.initialized) {
+    treeView.initialized = true;
+    mountRepoTree(repoTreeEl, { ref: 'HEAD' });
+  } else if (name === 'branches' && !branchView.initialized) {
+    branchView.initialized = true;
+    loadBranchTree();
   }
-  return data;
 }
 
-// ---- Branches (left pane) --------------------------------------------------
+function tabInitialized(name) {
+  if (name === 'full') return full.initialized;
+  if (name === 'tree') return treeView.initialized;
+  if (name === 'branches') return branchView.initialized;
+  return true; // history initializes at startup
+}
+
+for (const tab of tabEls) {
+  tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+}
+
+// ---- Branches (History left pane) ------------------------------------------
 
 async function loadBranches() {
   setPlaceholder(branchesEl, 'Loading…');
@@ -109,6 +131,21 @@ async function loadBranches() {
   if (local.length) frag.appendChild(renderBranchGroup('Local', local));
   if (remote.length) frag.appendChild(renderBranchGroup('Remote', remote));
   branchesEl.replaceChildren(frag);
+
+  // Auto-select the current (HEAD) branch on load, falling back to the first
+  // local branch, then any branch.
+  const headBranch =
+    branches.find((b) => b.isHead) || local[0] || branches[0];
+  if (headBranch) {
+    let targetRow = null;
+    for (const r of branchesEl.querySelectorAll('.branch-row')) {
+      if (r.dataset.branch === headBranch.name) {
+        targetRow = r;
+        break;
+      }
+    }
+    selectBranch(headBranch.name, targetRow);
+  }
 }
 
 function renderBranchGroup(label, list) {
@@ -126,8 +163,7 @@ function renderBranchRow(branch) {
     attrs: { type: 'button', role: 'listitem', 'data-branch': branch.name },
   });
 
-  const name = el('span', { className: 'branch-name', text: branch.name });
-  row.appendChild(name);
+  row.appendChild(el('span', { className: 'branch-name', text: branch.name }));
 
   if (branch.isHead) {
     row.appendChild(el('span', { className: 'badge badge-head', text: 'HEAD' }));
@@ -138,134 +174,194 @@ function renderBranchRow(branch) {
 }
 
 function selectBranch(name, rowEl) {
-  if (state.selectedBranch === name) return;
-  state.selectedBranch = name;
+  if (history.selectedBranch === name) return;
+  history.selectedBranch = name;
 
-  // highlight
   for (const r of branchesEl.querySelectorAll('.branch-row.selected')) {
     r.classList.remove('selected');
   }
   if (rowEl) rowEl.classList.add('selected');
 
   // reset detail
-  state.selectedSha = null;
-  setPlaceholder(detailEl, 'Select a commit');
+  history.selectedSha = null;
+  setPlaceholder(historyDetailEl, 'Select a commit');
 
-  loadCommits(name, /* reset */ true);
+  loadHistoryGraph(name, /* reset */ true);
 }
 
-// ---- Commits (middle pane) -------------------------------------------------
+// ---- Branches tab (drill-down branch tree chart) ---------------------------
 
-async function loadCommits(branch, reset) {
+async function loadBranchTree() {
+  setPlaceholder(branchTreeEl, 'Loading…');
+  let branches;
+  try {
+    branches = await fetchJson('/api/branches');
+  } catch (err) {
+    showError('Could not load branches: ' + err.message);
+    setPlaceholder(branchTreeEl, 'No branches');
+    return;
+  }
+  mountBranchTree(branchTreeEl, {
+    branches: Array.isArray(branches) ? branches : [],
+    onSelectBranch: (name) => {
+      activateTab('history');
+      selectBranchByName(name);
+    },
+  });
+}
+
+/** Select a branch in the History tab by name (used from the Branches tab). */
+function selectBranchByName(name) {
+  let row = null;
+  for (const r of branchesEl.querySelectorAll('.branch-row')) {
+    if (r.dataset.branch === name) {
+      row = r;
+      break;
+    }
+  }
+  // If already selected, ensure the graph is shown but skip a reload.
+  if (history.selectedBranch === name) {
+    if (row) row.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  selectBranch(name, row);
+  if (row) row.scrollIntoView({ block: 'nearest' });
+}
+
+// ---- History commit graph (middle pane) ------------------------------------
+
+async function loadHistoryGraph(branch, reset) {
   if (reset) {
-    state.commits = [];
-    state.skip = 0;
-    commitsTitleEl.textContent = branch;
-    setPlaceholder(commitsEl, 'Loading…');
+    history.commits = [];
+    history.skip = 0;
+    historyTitleEl.textContent = branch;
+    setPlaceholder(historyGraphEl, 'Loading…');
   }
 
   let page;
   try {
     page = await fetchJson(
-      `/api/commits?branch=${encodeURIComponent(branch)}&skip=${state.skip}&limit=${PAGE_LIMIT}`
+      `/api/graph?branch=${encodeURIComponent(branch)}&skip=${history.skip}&limit=${HISTORY_LIMIT}`
     );
   } catch (err) {
     showError('Could not load commits: ' + err.message);
-    if (reset) setPlaceholder(commitsEl, 'No commits');
+    if (reset) setPlaceholder(historyGraphEl, 'No commits');
     return;
   }
 
   // Branch changed while in-flight: ignore stale response.
-  if (state.selectedBranch !== branch) return;
+  if (history.selectedBranch !== branch) return;
 
   if (!Array.isArray(page)) page = [];
 
-  const fullPage = page.length === PAGE_LIMIT;
-  state.commits = state.commits.concat(page);
-  state.skip += page.length;
+  const fullPage = page.length === HISTORY_LIMIT;
+  history.commits = history.commits.concat(page);
+  history.skip += page.length;
 
-  if (state.commits.length === 0) {
-    setPlaceholder(commitsEl, 'No commits');
+  if (history.commits.length === 0) {
+    setPlaceholder(historyGraphEl, 'No commits');
     return;
   }
 
-  renderCommits(branch, fullPage);
+  drawHistoryGraph(branch, fullPage);
 }
 
-function renderCommits(branch, fullPage) {
-  const frag = document.createDocumentFragment();
-  for (const commit of state.commits) {
-    frag.appendChild(renderCommitRow(commit));
-  }
-
-  if (fullPage) {
-    const moreBtn = el('button', {
-      className: 'load-more',
-      text: 'Load more',
-      attrs: { type: 'button' },
-    });
-    moreBtn.addEventListener('click', () => {
-      if (state.loadingMore) return;
-      state.loadingMore = true;
-      moreBtn.disabled = true;
-      moreBtn.textContent = 'Loading…';
-      loadCommits(branch, /* reset */ false).finally(() => {
-        state.loadingMore = false;
-      });
-    });
-    frag.appendChild(moreBtn);
-  }
-
-  commitsEl.replaceChildren(frag);
-
-  // re-apply selection highlight after re-render
-  if (state.selectedSha) {
-    const sel = commitsEl.querySelector(
-      `.commit-row[data-sha="${cssEscape(state.selectedSha)}"]`
-    );
-    if (sel) sel.classList.add('selected');
-  }
-}
-
-function renderCommitRow(commit) {
-  const row = el('button', {
-    className: 'commit-row',
-    attrs: { type: 'button', role: 'listitem', 'data-sha': commit.sha },
+function drawHistoryGraph(branch, fullPage) {
+  renderCommitGraph(historyGraphEl, history.commits, {
+    selectedSha: history.selectedSha,
+    onSelect: (sha) => selectHistoryCommit(sha),
+    showRefs: true,
   });
-
-  row.appendChild(el('div', { className: 'commit-subject', text: commit.subject }));
-
-  const meta = el('div', { className: 'commit-meta' });
-  meta.appendChild(el('span', { className: 'commit-sha mono', text: commit.shortSha }));
-  meta.appendChild(el('span', { className: 'sep', text: '·' }));
-  meta.appendChild(el('span', { className: 'commit-author', text: commit.author }));
-  meta.appendChild(el('span', { className: 'sep', text: '·' }));
-  meta.appendChild(el('span', { className: 'commit-date', text: commit.dateRelative }));
-  row.appendChild(meta);
-
-  row.addEventListener('click', () => selectCommit(commit.sha, row));
-  return row;
+  appendLoadMore(historyGraphEl, fullPage, history, () =>
+    loadHistoryGraph(branch, /* reset */ false)
+  );
 }
 
-/** Minimal CSS attribute-value escaper for querySelector. */
-function cssEscape(value) {
-  return String(value).replace(/["\\]/g, '\\$&');
+function selectHistoryCommit(sha) {
+  history.selectedSha = sha;
+  highlightCommit(historyGraphEl, sha);
+  loadDetail(sha, history, historyDetailEl);
 }
 
-function selectCommit(sha, rowEl) {
-  state.selectedSha = sha;
+// ---- Full graph (all branches) ---------------------------------------------
 
-  for (const r of commitsEl.querySelectorAll('.commit-row.selected')) {
-    r.classList.remove('selected');
+async function loadFullGraph(reset) {
+  if (reset) {
+    full.commits = [];
+    full.skip = 0;
+    setPlaceholder(fullGraphEl, 'Loading…');
   }
-  if (rowEl) rowEl.classList.add('selected');
 
-  loadDetail(sha);
+  let page;
+  try {
+    page = await fetchJson(
+      `/api/graph?all=true&skip=${full.skip}&limit=${FULL_LIMIT}`
+    );
+  } catch (err) {
+    showError('Could not load graph: ' + err.message);
+    if (reset) setPlaceholder(fullGraphEl, 'No commits');
+    return;
+  }
+
+  if (!Array.isArray(page)) page = [];
+
+  const fullPage = page.length === FULL_LIMIT;
+  full.commits = full.commits.concat(page);
+  full.skip += page.length;
+
+  if (full.commits.length === 0) {
+    setPlaceholder(fullGraphEl, 'No commits');
+    return;
+  }
+
+  drawFullGraph(fullPage);
 }
 
-// ---- Detail (right pane) ---------------------------------------------------
+function drawFullGraph(fullPage) {
+  renderCommitGraph(fullGraphEl, full.commits, {
+    selectedSha: full.selectedSha,
+    onSelect: (sha) => selectFullCommit(sha),
+    showRefs: true,
+  });
+  appendLoadMore(fullGraphEl, fullPage, full, () =>
+    loadFullGraph(/* reset */ false)
+  );
+}
 
-async function loadDetail(sha) {
+function selectFullCommit(sha) {
+  full.selectedSha = sha;
+  highlightCommit(fullGraphEl, sha);
+  loadDetail(sha, full, fullDetailEl);
+}
+
+// ---- Shared: "Load more" button --------------------------------------------
+
+/**
+ * Append a "Load more" button to a graph container if the last page was full.
+ * `flagHolder` carries a `loadingMore` boolean; `loader` returns a promise.
+ */
+function appendLoadMore(container, fullPage, flagHolder, loader) {
+  if (!fullPage) return;
+  const moreBtn = el('button', {
+    className: 'load-more',
+    text: 'Load more',
+    attrs: { type: 'button' },
+  });
+  moreBtn.addEventListener('click', () => {
+    if (flagHolder.loadingMore) return;
+    flagHolder.loadingMore = true;
+    moreBtn.disabled = true;
+    moreBtn.textContent = 'Loading…';
+    loader().finally(() => {
+      flagHolder.loadingMore = false;
+    });
+  });
+  container.appendChild(moreBtn);
+}
+
+// ---- Detail (right pane, shared by History & Full Graph) -------------------
+
+async function loadDetail(sha, owner, detailEl) {
   setPlaceholder(detailEl, 'Loading…');
 
   let detail;
@@ -278,12 +374,12 @@ async function loadDetail(sha) {
   }
 
   // Selection changed while in-flight: ignore stale response.
-  if (state.selectedSha !== sha) return;
+  if (owner.selectedSha !== sha) return;
 
-  renderDetail(detail);
+  renderDetail(detail, detailEl);
 }
 
-function renderDetail(detail) {
+function renderDetail(detail, detailEl) {
   const frag = document.createDocumentFragment();
 
   // Header
@@ -375,8 +471,56 @@ function diffLineClass(line) {
   return 'diff-ctx';
 }
 
+// ---- Resizable panels ------------------------------------------------------
+
+/**
+ * Make `.splitter` handles drag-resize their neighbouring pane by setting a CSS
+ * variable on the owning grid container.
+ *   data-css-var : the CSS custom property to update (column width)
+ *   data-side    : "left" resizes the pane before the splitter, "right" after
+ *   data-min/max : clamp bounds in px
+ */
+function initResizers() {
+  for (const splitter of document.querySelectorAll('.splitter')) {
+    splitter.addEventListener('mousedown', (e) => startResize(e, splitter));
+  }
+}
+
+function startResize(e, splitter) {
+  e.preventDefault();
+  const container = splitter.parentElement;
+  const cssVar = splitter.dataset.cssVar;
+  const side = splitter.dataset.side || 'left';
+  const min = parseInt(splitter.dataset.min, 10) || 120;
+  const max = parseInt(splitter.dataset.max, 10) || 1200;
+  const pane =
+    side === 'left' ? splitter.previousElementSibling : splitter.nextElementSibling;
+  if (!pane) return;
+
+  splitter.classList.add('dragging');
+  document.body.classList.add('resizing');
+
+  const onMove = (ev) => {
+    const rect = pane.getBoundingClientRect();
+    let width = side === 'left' ? ev.clientX - rect.left : rect.right - ev.clientX;
+    width = Math.max(min, Math.min(max, width));
+    container.style.setProperty(cssVar, width + 'px');
+  };
+  const onUp = () => {
+    splitter.classList.remove('dragging');
+    document.body.classList.remove('resizing');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
 // ---- Init ------------------------------------------------------------------
 
-errorDismissEl.addEventListener('click', clearError);
+if (errorDismissEl) errorDismissEl.addEventListener('click', clearError);
 
+initResizers();
+
+// History is the default tab; load its branches immediately.
 loadBranches();

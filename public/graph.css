@@ -1,0 +1,167 @@
+/* ----------------------------------------------------------------------------
+ * Meld — commit-graph renderer styles. Dark theme, dev-tool flavored.
+ * All classes namespaced `graph-`. Owned solely by graph.js / graph.css.
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --graph-row-h: 48px;
+  --graph-bg: #0d1117;
+  --graph-fg: #c9d1d9;
+  --graph-fg-dim: #8b949e;
+  --graph-border: #21262d;
+  --graph-hover: #161b22;
+  --graph-selected: #1f2733;
+  --graph-selected-bar: #4eb4f7;
+}
+
+/* ---- Rows -------------------------------------------------------------- */
+.graph-row {
+  display: flex;
+  align-items: stretch;
+  height: var(--graph-row-h);
+  min-height: var(--graph-row-h);
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  color: var(--graph-fg);
+  font: 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  outline: none;
+}
+
+.graph-row:hover {
+  background: var(--graph-hover);
+}
+
+.graph-row:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--graph-selected-bar);
+}
+
+.graph-row.selected {
+  background: var(--graph-selected);
+  border-left-color: var(--graph-selected-bar);
+}
+
+/* ---- Gutter (SVG lane graph) ------------------------------------------ */
+.graph-gutter {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  height: var(--graph-row-h);
+}
+
+.graph-gutter-svg {
+  display: block;
+  height: var(--graph-row-h);
+  overflow: visible;
+}
+
+.graph-edge {
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* Edge that heads off the loaded window (parent not loaded). */
+.graph-edge-open {
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+
+.graph-node {
+  stroke: var(--graph-bg);
+  stroke-width: 1.5;
+}
+
+.graph-row:hover .graph-node,
+.graph-row.selected .graph-node {
+  stroke: #ffffff;
+}
+
+/* ---- Commit info ------------------------------------------------------- */
+.graph-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2px 12px 2px 4px;
+  gap: 1px;
+}
+
+.graph-subject {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--graph-fg);
+}
+
+.graph-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--graph-fg-dim);
+}
+
+.graph-sha {
+  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  color: #79c0ff;
+}
+
+.graph-meta-sep {
+  color: var(--graph-border);
+}
+
+.graph-author,
+.graph-date {
+  color: var(--graph-fg-dim);
+}
+
+/* ---- Ref badges -------------------------------------------------------- */
+.graph-refs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.graph-ref {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* HEAD / local branch — greenish */
+.graph-ref-head {
+  color: #56d364;
+  background: rgba(86, 211, 100, 0.12);
+  border-color: rgba(86, 211, 100, 0.4);
+}
+
+/* Tag — yellowish */
+.graph-ref-tag {
+  color: #e3b341;
+  background: rgba(227, 179, 65, 0.12);
+  border-color: rgba(227, 179, 65, 0.4);
+}
+
+/* Remote-tracking branch — bluish */
+.graph-ref-remote {
+  color: #79c0ff;
+  background: rgba(121, 192, 255, 0.12);
+  border-color: rgba(121, 192, 255, 0.4);
+}
+
+/* ---- Placeholder ------------------------------------------------------- */
+.graph-row + .placeholder,
+.placeholder {
+  padding: 16px;
+  color: var(--graph-fg-dim);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}

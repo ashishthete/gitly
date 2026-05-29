@@ -1,0 +1,144 @@
+/* ----------------------------------------------------------------------------
+ * gitly — Repo Tree tab styles. Vanilla CSS, no external assets.
+ * Inherits theme tokens (--bg, --text, --accent, …) from style.css :root.
+ *
+ * Scope: ONLY the two-pane layout (left = shared tree-chart host, right = file
+ * viewer) and the `fileview-` viewer styles. The tree-chart itself is styled by
+ * treechart.css (`.tc-*` classes) — do not restyle those here.
+ * -------------------------------------------------------------------------- */
+
+/* ---- Two-pane layout ------------------------------------------------------ */
+
+.tree-layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Left pane: host for the shared tree-chart. Fills its column; the chart's own
+ * `.tc-scroll` handles scrolling. */
+.tree-pane {
+  flex: 0 0 50%;
+  max-width: 70%;
+  min-width: 220px;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border, #21262d);
+  background: var(--bg-pane, #0d1117);
+  display: flex;
+  flex-direction: column;
+}
+
+.fileview-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-pane, #0d1117);
+}
+
+/* ---- File viewer ---------------------------------------------------------- */
+
+.fileview-inner {
+  display: block;
+  min-height: 100%;
+}
+
+.fileview-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border, #21262d);
+  background: var(--bg-elev, #161b22);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.fileview-path {
+  font-size: 12px;
+  color: var(--text, #c9d1d9);
+  overflow-wrap: anywhere;
+}
+.fileview-size {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-faint, #6e7681);
+}
+
+.fileview-note {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--st-mod, #d29922);
+  background: #2a210033;
+  border-bottom: 1px solid var(--border, #21262d);
+}
+
+.fileview-binary {
+  padding: 16px;
+  font-style: italic;
+  color: var(--text-faint, #6e7681);
+}
+
+/* ---- Code with line-number gutter ----------------------------------------- */
+
+.fileview-code {
+  display: flex;
+  align-items: flex-start;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 4;
+}
+
+.fileview-gutter {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 8px 12px;
+  text-align: right;
+  color: var(--text-faint, #6e7681);
+  background: var(--bg-elev, #161b22);
+  border-right: 1px solid var(--border, #21262d);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.fileview-lineno {
+  display: block;
+  min-width: 2.5ch;
+  white-space: pre;
+}
+
+.fileview-lines {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 0 8px 12px;
+  overflow-x: auto;
+}
+.fileview-line {
+  display: block;
+  white-space: pre;
+  color: var(--text, #c9d1d9);
+  padding-right: 16px;
+}
+
+/* ---- Scrollbars (match dev-tool theme) ------------------------------------ */
+
+.fileview-pane::-webkit-scrollbar,
+.fileview-lines::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.fileview-pane::-webkit-scrollbar-thumb,
+.fileview-lines::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #30363d);
+  border-radius: 5px;
+  border: 2px solid var(--bg, #0d1117);
+}
+.fileview-pane::-webkit-scrollbar-track,
+.fileview-lines::-webkit-scrollbar-track {
+  background: transparent;
+}

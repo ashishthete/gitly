@@ -6,7 +6,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { getBranches, getCommits, getCommit } from '../src/git.js';
+import {
+  getBranches,
+  getCommits,
+  getCommit,
+  getGraph,
+  getTree,
+  getFileContent,
+} from '../src/git.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -175,4 +182,77 @@ test('getCommit flags binary files with empty diff', async () => {
   assert.equal(file.binary, true);
   assert.equal(file.diff, '');
   assert.equal(file.status, 'A');
+});
+
+test('getGraph reports parents: root has [], non-root has a 40-hex parent', async () => {
+  const graph = await getGraph(repo, { branch: 'main' });
+
+  assert.ok(graph.length >= 5, 'commits from main');
+
+  for (const c of graph) {
+    assert.ok(c.sha && c.sha.length === 40, 'full sha');
+    assert.ok(c.shortSha && c.shortSha.length > 0, 'short sha');
+    assert.ok(Array.isArray(c.parents), 'parents is an array');
+    assert.ok(Array.isArray(c.refs), 'refs is an array');
+    assert.ok(c.author && c.author.length > 0, 'author');
+    assert.ok(c.dateRelative && c.dateRelative.length > 0, 'relative date');
+    assert.ok(c.dateIso && c.dateIso.length > 0, 'iso date');
+    assert.ok(c.subject && c.subject.length > 0, 'subject');
+  }
+
+  // The very first commit (root) has no parents.
+  const root = graph.find((c) => c.subject === 'Add hello.txt');
+  assert.ok(root, 'root commit present');
+  assert.deepEqual(root.parents, [], 'root commit has no parents');
+
+  // A later commit has at least one full-sha parent.
+  const nonRoot = graph.find((c) => c.subject === 'Modify hello.txt');
+  assert.ok(nonRoot, 'non-root commit present');
+  assert.ok(nonRoot.parents.length >= 1, 'non-root has a parent');
+  assert.match(nonRoot.parents[0], /^[0-9a-f]{40}$/, 'parent is a 40-hex sha');
+});
+
+test('getGraph({ all: true }) includes commits from both branches', async () => {
+  const single = await getGraph(repo, { branch: 'main' });
+  const all = await getGraph(repo, { all: true });
+
+  assert.ok(all.length >= single.length, 'all >= single branch count');
+
+  const onlyOnOther = all.find(
+    (c) => c.subject === 'Add other.txt on other branch'
+  );
+  assert.ok(onlyOnOther, 'commit unique to other branch present with all:true');
+});
+
+test('getTree lists blobs and trees with sizes and known path', async () => {
+  const entries = await getTree(repo, 'HEAD');
+
+  assert.ok(entries.length > 0, 'has entries');
+
+  const blob = entries.find((e) => e.type === 'blob');
+  assert.ok(blob, 'has a blob');
+  assert.equal(typeof blob.size, 'number', 'blob size is numeric');
+
+  const hello = entries.find((e) => e.path === 'hello.txt');
+  assert.ok(hello, 'hello.txt present');
+  assert.equal(hello.type, 'blob');
+});
+
+test('getFileContent returns text content for a text file', async () => {
+  const file = await getFileContent(repo, 'HEAD', 'hello.txt');
+
+  assert.equal(file.binary, false);
+  assert.equal(typeof file.content, 'string');
+  assert.ok(file.content.length > 0, 'non-empty content');
+  assert.match(file.content, /line one/, 'contains known text');
+  assert.equal(file.truncated, false);
+  assert.ok(file.size > 0, 'size populated');
+});
+
+test('getFileContent flags binary files with empty content', async () => {
+  const file = await getFileContent(repo, 'HEAD', 'blob.bin');
+
+  assert.equal(file.binary, true);
+  assert.equal(file.content, '');
+  assert.ok(file.size > 0, 'size populated');
 });

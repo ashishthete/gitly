@@ -34,6 +34,29 @@ async function run(repoRoot, args) {
 }
 
 /**
+ * Like run(), but returns stdout as a Buffer (for binary-safe content).
+ * @param {string} repoRoot
+ * @param {string[]} args
+ * @returns {Promise<Buffer>} stdout
+ */
+async function runBuffer(repoRoot, args) {
+  try {
+    const { stdout } = await execFileAsync('git', args, {
+      cwd: repoRoot,
+      maxBuffer: MAX_BUFFER,
+      encoding: 'buffer',
+    });
+    return stdout;
+  } catch (err) {
+    const stderr = err && err.stderr ? String(err.stderr).trim() : '';
+    const message = stderr || (err && err.message) || 'git command failed';
+    const wrapped = new Error(`git ${args.join(' ')}: ${message}`);
+    wrapped.cause = err;
+    throw wrapped;
+  }
+}
+
+/**
  * List local and remote branches.
  * @param {string} repoRoot
  * @returns {Promise<Array<{name: string, type: 'local'|'remote', isHead: boolean}>>}
@@ -177,6 +200,129 @@ export async function getCommit(repoRoot, sha) {
     body: (body || '').replace(/\n+$/, ''),
     files,
   };
+}
+
+/**
+ * Commit graph: commits with parent SHAs and ref decorations, topo-ordered.
+ * @param {string} repoRoot
+ * @param {{branch?: string, all?: boolean, skip?: number, limit?: number}} [opts]
+ * @returns {Promise<Array<{sha,shortSha,parents,author,dateRelative,dateIso,subject,refs}>>}
+ */
+export async function getGraph(
+  repoRoot,
+  { branch, all = false, skip = 0, limit = 200 } = {}
+) {
+  const fields = ['%H', '%h', '%P', '%an', '%ar', '%aI', '%s', '%D'].join('%x1f');
+  const format = `${fields}%x1e`;
+
+  const args = [
+    'log',
+    '--topo-order',
+    `--skip=${skip}`,
+    `--max-count=${limit}`,
+    `--format=${format}`,
+  ];
+  if (all) {
+    args.push('--all');
+  } else {
+    args.push(branch && branch.length ? branch : 'HEAD');
+  }
+
+  const stdout = await run(repoRoot, args);
+
+  const commits = [];
+  for (const record of stdout.split(RS)) {
+    const trimmed = record.replace(/^\n+/, '');
+    if (!trimmed) continue;
+    const parts = trimmed.split(FS);
+    if (parts.length < 8) continue;
+    const [sha, shortSha, parentsRaw, author, dateRelative, dateIso, subject, decorate] =
+      parts;
+    const parents = parentsRaw.split(' ').filter((p) => p.length > 0);
+    const refs = decorate
+      .split(', ')
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+    commits.push({
+      sha,
+      shortSha,
+      parents,
+      author,
+      dateRelative,
+      dateIso,
+      subject,
+      refs,
+    });
+  }
+
+  return commits;
+}
+
+/**
+ * List every tree entry recursively at a ref (files and directories).
+ * @param {string} repoRoot
+ * @param {string} [ref]
+ * @returns {Promise<Array<{path, type, size}>>}
+ */
+export async function getTree(repoRoot, ref = 'HEAD') {
+  // <mode> <type> <object> <size>\t<path>
+  const stdout = await run(repoRoot, ['ls-tree', '-r', '-t', '-l', ref]);
+
+  const entries = [];
+  for (const line of stdout.split('\n')) {
+    if (!line) continue;
+    const tabIdx = line.indexOf('\t');
+    if (tabIdx === -1) continue;
+    const meta = line.slice(0, tabIdx);
+    const path = line.slice(tabIdx + 1);
+    const cols = meta.split(/\s+/);
+    // cols: [mode, type, object, size]
+    const type = cols[1];
+    const sizeRaw = cols[3];
+    const size = sizeRaw === '-' ? null : parseInt(sizeRaw, 10);
+    entries.push({ path, type, size });
+  }
+
+  entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return entries;
+}
+
+/**
+ * Read a file's content at a ref, with binary detection and truncation.
+ * @param {string} repoRoot
+ * @param {string} [ref]
+ * @param {string} filePath
+ * @returns {Promise<{path, content, binary, size, truncated}>}
+ */
+export async function getFileContent(repoRoot, ref = 'HEAD', filePath) {
+  const buf = await runBuffer(repoRoot, ['show', `${ref}:${filePath}`]);
+
+  const size = buf.length;
+
+  // Binary if a NUL byte appears in the first ~8000 bytes.
+  const sniffLen = Math.min(size, 8000);
+  let binary = false;
+  for (let i = 0; i < sniffLen; i++) {
+    if (buf[i] === 0x00) {
+      binary = true;
+      break;
+    }
+  }
+
+  if (binary) {
+    return { path: filePath, content: '', binary: true, size, truncated: false };
+  }
+
+  const MAX_TEXT = 2 * 1024 * 1024;
+  let truncated = false;
+  let slice = buf;
+  if (size > MAX_TEXT) {
+    slice = buf.subarray(0, MAX_TEXT);
+    truncated = true;
+  }
+  const content = slice.toString('utf8');
+
+  return { path: filePath, content, binary: false, size, truncated };
 }
 
 function normalizeStatus(code) {

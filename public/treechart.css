@@ -1,0 +1,167 @@
+/* ----------------------------------------------------------------------------
+ * gitly — reusable drill-down tree-chart component styles.
+ * Vanilla CSS, no external assets. Classes namespaced `tc-`.
+ * Inherits theme tokens (--bg, --text, --accent, …) with safe fallbacks.
+ * -------------------------------------------------------------------------- */
+
+/* ---- Host / layout -------------------------------------------------------- */
+
+.tc-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-pane, #0d1117);
+  color: var(--text, #c9d1d9);
+}
+
+/* ---- Breadcrumb ----------------------------------------------------------- */
+
+.tc-breadcrumb {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border, #21262d);
+  background: var(--bg-elev, #161b22);
+}
+
+.tc-crumb {
+  color: var(--text-dim, #8b949e);
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: pointer;
+  transition: color 0.08s ease, background 0.08s ease;
+}
+.tc-crumb:hover {
+  color: var(--accent, #1f6feb);
+  background: var(--bg, #0d1117);
+}
+.tc-crumb:focus-visible {
+  outline: 1px solid var(--accent, #1f6feb);
+  outline-offset: 1px;
+}
+
+/* Current / last crumb — non-clickable, emphasized. */
+.tc-crumb.is-current {
+  color: var(--text, #c9d1d9);
+  font-weight: 600;
+  cursor: default;
+}
+.tc-crumb.is-current:hover {
+  background: transparent;
+  color: var(--text, #c9d1d9);
+}
+
+.tc-crumb-sep {
+  color: var(--text-faint, #6e7681);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---- Scrollable chart area ------------------------------------------------ */
+
+.tc-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto; /* horizontal + vertical scroll for large charts */
+  padding: 4px;
+}
+
+.tc-empty {
+  padding: 16px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-faint, #6e7681);
+}
+
+.tc-svg {
+  display: block;
+}
+
+/* ---- Links: muted cubic-bezier S-curves ----------------------------------- */
+
+.tc-link {
+  fill: none;
+  stroke: var(--border-strong, #30363d);
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+
+/* ---- Nodes ---------------------------------------------------------------- */
+
+.tc-node .tc-circle {
+  stroke-width: 1.5;
+  transition: stroke 0.08s ease, fill 0.08s ease;
+}
+
+/* Folder circles: accent-filled. */
+.tc-node.is-folder .tc-circle {
+  fill: var(--accent, #1f6feb);
+  stroke: var(--accent, #1f6feb);
+}
+
+/* Leaf circles: hollow / dim. */
+.tc-node.is-leaf .tc-circle {
+  fill: var(--bg-pane, #0d1117);
+  stroke: var(--text-faint, #6e7681);
+}
+
+/* Labels — monospace. */
+.tc-label {
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tc-node.is-folder .tc-label {
+  fill: var(--text, #c9d1d9);
+  font-weight: 500;
+}
+.tc-node.is-leaf .tc-label {
+  fill: var(--text-dim, #8b949e);
+}
+
+/* Clickable affordance. */
+.tc-node.clickable {
+  cursor: pointer;
+}
+.tc-node.clickable:hover .tc-circle {
+  stroke: var(--accent, #1f6feb);
+}
+.tc-node.clickable:hover .tc-label {
+  fill: var(--text, #c9d1d9);
+}
+
+/* Selected / focus node. */
+.tc-node.selected .tc-circle {
+  fill: var(--accent, #1f6feb);
+  stroke: var(--accent, #1f6feb);
+}
+.tc-node.selected .tc-label {
+  fill: var(--text, #c9d1d9);
+  font-weight: 600;
+}
+
+/* ---- Scrollbars (match dev-tool theme) ------------------------------------ */
+
+.tc-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.tc-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #30363d);
+  border-radius: 5px;
+  border: 2px solid var(--bg, #0d1117);
+}
+.tc-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

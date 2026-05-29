@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Meld — git history viewer</title>
+  <title>gitly</title>
   <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/graph.css" />
+  <link rel="stylesheet" href="/tree.css" />
+  <link rel="stylesheet" href="/treechart.css" />
 </head>
 <body>
   <div id="error-banner" class="error-banner" hidden>
@@ -12,39 +15,87 @@
     <button id="error-dismiss" class="error-dismiss" type="button" aria-label="Dismiss">&times;</button>
   </div>
 
-  <div class="app">
-    <!-- LEFT: branches -->
-    <aside class="pane pane-branches">
-      <header class="pane-header">
-        <span class="pane-title">Meld</span>
-        <span class="pane-subtitle">branches</span>
-      </header>
-      <div id="branches" class="pane-body" role="list">
-        <div class="placeholder">Loading…</div>
-      </div>
-    </aside>
+  <!-- TAB BAR -->
+  <nav class="tab-bar" role="tablist" aria-label="Views">
+    <span class="tab-brand">gitly</span>
+    <button class="tab active" type="button" role="tab" data-tab="history" aria-selected="true">History</button>
+    <button class="tab" type="button" role="tab" data-tab="branches" aria-selected="false">Branches</button>
+    <button class="tab" type="button" role="tab" data-tab="full" aria-selected="false">Full Graph</button>
+    <button class="tab" type="button" role="tab" data-tab="tree" aria-selected="false">Repo Tree</button>
+  </nav>
 
-    <!-- MIDDLE: commits -->
-    <section class="pane pane-commits">
-      <header class="pane-header">
-        <span class="pane-title" id="commits-title">Commits</span>
-      </header>
-      <div id="commits" class="pane-body" role="list">
-        <div class="placeholder">Select a branch</div>
-      </div>
+  <main class="tab-panels">
+    <!-- HISTORY: branches | commit graph | detail -->
+    <section class="tab-panel active history-layout" id="panel-history" role="tabpanel" data-tab="history">
+      <aside class="pane pane-branches">
+        <header class="pane-header">
+          <span class="pane-title">Branches</span>
+        </header>
+        <div id="branches" class="pane-body" role="list">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </aside>
+
+      <div class="splitter" role="separator" aria-orientation="vertical"
+           data-css-var="--hist-c0" data-side="left" data-min="150" data-max="500"></div>
+
+      <section class="pane pane-commits">
+        <header class="pane-header">
+          <span class="pane-title" id="history-title">Commits</span>
+        </header>
+        <div id="history-graph" class="pane-body" role="list">
+          <div class="placeholder">Select a branch</div>
+        </div>
+      </section>
+
+      <div class="splitter" role="separator" aria-orientation="vertical"
+           data-css-var="--hist-c1" data-side="left" data-min="260" data-max="900"></div>
+
+      <section class="pane pane-detail">
+        <header class="pane-header">
+          <span class="pane-title">Detail</span>
+        </header>
+        <div id="history-detail" class="pane-body">
+          <div class="placeholder">Select a commit</div>
+        </div>
+      </section>
     </section>
 
-    <!-- RIGHT: commit detail -->
-    <section class="pane pane-detail">
-      <header class="pane-header">
-        <span class="pane-title">Detail</span>
-      </header>
-      <div id="detail" class="pane-body">
-        <div class="placeholder">Select a commit</div>
-      </div>
-    </section>
-  </div>
+    <!-- FULL GRAPH: graph | detail -->
+    <section class="tab-panel fullgraph-layout" id="panel-full" role="tabpanel" data-tab="full" hidden>
+      <section class="pane pane-fullgraph">
+        <header class="pane-header">
+          <span class="pane-title">All branches</span>
+        </header>
+        <div id="full-graph" class="pane-body" role="list">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </section>
 
-  <script src="/app.js"></script>
+      <div class="splitter" role="separator" aria-orientation="vertical"
+           data-css-var="--full-c1" data-side="right" data-min="300" data-max="1000"></div>
+
+      <section class="pane pane-detail">
+        <header class="pane-header">
+          <span class="pane-title">Detail</span>
+        </header>
+        <div id="full-detail" class="pane-body">
+          <div class="placeholder">Select a commit</div>
+        </div>
+      </section>
+    </section>
+
+    <!-- BRANCHES: single container owned by branches.js -->
+    <section class="tab-panel tree-layout" id="panel-branches" role="tabpanel" data-tab="branches" hidden>
+      <div id="branch-tree" class="repo-tree-host"></div>
+    </section>
+
+    <!-- REPO TREE: single container owned by tree.js -->
+    <section class="tab-panel tree-layout" id="panel-tree" role="tabpanel" data-tab="tree" hidden>
+      <div id="repo-tree" class="repo-tree-host"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

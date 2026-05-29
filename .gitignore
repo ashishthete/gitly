@@ -1,2 +1,10 @@
+# dependencies (none currently, but in case any are added)
 node_modules/
+
+# macOS
 .DS_Store
+
+# logs / editor noise
+*.log
+.vscode/
+.idea/

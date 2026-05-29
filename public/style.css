@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * Meld — git history viewer
+ * gitly — read-only git viewer
  * Dark, compact dev-tool aesthetic. Vanilla CSS, no external assets.
  * -------------------------------------------------------------------------- */
 
@@ -48,14 +48,110 @@ body {
 
 .mono { font-family: var(--mono); }
 
-/* ---- Layout --------------------------------------------------------------- */
+/* ---- Tab bar -------------------------------------------------------------- */
 
-.app {
-  display: grid;
-  grid-template-columns: 240px 360px 1fr;
-  height: 100vh;
+.tab-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 40px;
+  padding: 0 10px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border-strong);
+}
+.tab-brand {
+  display: flex;
+  align-items: center;
+  padding: 0 14px 0 4px;
+  margin-right: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); }
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* ---- Tab panels ----------------------------------------------------------- */
+
+.tab-panels {
+  height: calc(100vh - 40px);
   width: 100vw;
   overflow: hidden;
+}
+
+.tab-panel {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+.tab-panel[hidden] { display: none; }
+
+/* History: branches | splitter | commit graph | splitter | detail */
+.history-layout {
+  display: grid;
+  grid-template-columns:
+    var(--hist-c0, 240px) var(--splitter-w) var(--hist-c1, 440px) var(--splitter-w) minmax(0, 1fr);
+}
+
+/* Full Graph: graph | splitter | detail */
+.fullgraph-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--splitter-w) var(--full-c1, 480px);
+}
+
+/* ---- Resizable splitters -------------------------------------------------- */
+
+:root { --splitter-w: 6px; }
+
+.splitter {
+  align-self: stretch;
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  z-index: 2;
+}
+.splitter::after {
+  /* widen the grab target without taking layout space */
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+}
+.splitter:hover,
+.splitter.dragging { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; }
+
+/* Repo Tree: single fill container */
+.tree-layout { display: block; }
+.repo-tree-host {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
 }
 
 .pane {
