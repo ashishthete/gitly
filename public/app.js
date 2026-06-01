@@ -264,6 +264,11 @@ async function loadHistoryGraph(branch, reset) {
   }
 
   drawHistoryGraph(branch, fullPage);
+
+  // On a fresh branch load, auto-select the most recent commit.
+  if (reset && history.selectedSha === null) {
+    selectHistoryCommit(history.commits[0].sha);
+  }
 }
 
 function drawHistoryGraph(branch, fullPage) {
@@ -402,13 +407,44 @@ function renderDetail(detail, detailEl) {
   if (files.length === 0) {
     frag.appendChild(el('div', { className: 'placeholder', text: 'No file changes' }));
   } else {
+    frag.appendChild(renderFilesToolbar(files.length, detailEl));
+    const list = el('div', { className: 'file-list' });
     for (const file of files) {
-      frag.appendChild(renderFile(file));
+      list.appendChild(renderFile(file));
     }
+    frag.appendChild(list);
   }
 
   detailEl.replaceChildren(frag);
   detailEl.scrollTop = 0;
+}
+
+function renderFilesToolbar(count, detailEl) {
+  const bar = el('div', { className: 'files-toolbar' });
+  bar.appendChild(el('span', {
+    className: 'files-count',
+    text: count + ' file' + (count === 1 ? '' : 's') + ' changed',
+  }));
+
+  const setAll = (collapsed) => {
+    for (const block of detailEl.querySelectorAll('.file-block')) {
+      setFileCollapsed(block, collapsed);
+    }
+  };
+  const expandBtn = el('button', { className: 'files-toggle-all', text: 'Expand all', attrs: { type: 'button' } });
+  expandBtn.addEventListener('click', () => setAll(false));
+  const collapseBtn = el('button', { className: 'files-toggle-all', text: 'Collapse all', attrs: { type: 'button' } });
+  collapseBtn.addEventListener('click', () => setAll(true));
+
+  bar.appendChild(expandBtn);
+  bar.appendChild(collapseBtn);
+  return bar;
+}
+
+function setFileCollapsed(block, collapsed) {
+  block.classList.toggle('collapsed', collapsed);
+  const head = block.querySelector('.file-head');
+  if (head) head.setAttribute('aria-expanded', String(!collapsed));
 }
 
 function metaRow(label, value, mono) {
@@ -421,9 +457,13 @@ function metaRow(label, value, mono) {
 const STATUS_LABELS = { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed' };
 
 function renderFile(file) {
-  const block = el('div', { className: 'file-block' });
+  const block = el('div', { className: 'file-block collapsed' });
 
-  const head = el('div', { className: 'file-head' });
+  const head = el('button', {
+    className: 'file-head',
+    attrs: { type: 'button', 'aria-expanded': 'false' },
+  });
+  head.appendChild(el('span', { className: 'file-chevron', attrs: { 'aria-hidden': 'true' } }));
   const status = (file.status || '').toUpperCase().charAt(0);
   const badge = el('span', {
     className: 'badge status-' + (status || 'x'),
@@ -432,20 +472,23 @@ function renderFile(file) {
   });
   head.appendChild(badge);
   head.appendChild(el('span', { className: 'file-path mono', text: file.path }));
+  head.addEventListener('click', () => {
+    setFileCollapsed(block, !block.classList.contains('collapsed'));
+  });
   block.appendChild(head);
 
+  const body = el('div', { className: 'file-body' });
   if (file.binary === true) {
-    block.appendChild(el('div', { className: 'binary-note', text: 'binary file (no diff)' }));
-    return block;
+    body.appendChild(el('div', { className: 'binary-note', text: 'binary file (no diff)' }));
+  } else {
+    const diffText = typeof file.diff === 'string' ? file.diff : '';
+    if (diffText === '') {
+      body.appendChild(el('div', { className: 'binary-note', text: 'no diff' }));
+    } else {
+      body.appendChild(renderDiff(diffText));
+    }
   }
-
-  const diffText = typeof file.diff === 'string' ? file.diff : '';
-  if (diffText === '') {
-    block.appendChild(el('div', { className: 'binary-note', text: 'no diff' }));
-    return block;
-  }
-
-  block.appendChild(renderDiff(diffText));
+  block.appendChild(body);
   return block;
 }
 
