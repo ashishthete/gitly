@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------------- */
 
 :root {
-  --graph-row-h: 48px;
+  --graph-row-h: 64px;
   --graph-bg: #0d1117;
   --graph-fg: #c9d1d9;
   --graph-fg-dim: #8b949e;
@@ -115,6 +115,42 @@
 .graph-date {
   color: var(--graph-fg-dim);
 }
+
+/* ---- Per-commit change stats ------------------------------------------ */
+.graph-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-stat-lines {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.graph-stat-add { color: #56d364; }
+.graph-stat-del { color: #ff7b72; }
+
+.graph-stat-files {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.graph-fstat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+.graph-fstat-n { color: var(--graph-fg-dim); }
+.graph-fstat-c { font-weight: 700; }
+.graph-fstat-A .graph-fstat-c { color: #56d364; }
+.graph-fstat-M .graph-fstat-c { color: #e3b341; }
+.graph-fstat-D .graph-fstat-c { color: #ff7b72; }
 
 /* ---- Ref badges -------------------------------------------------------- */
 .graph-refs {

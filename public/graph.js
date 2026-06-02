@@ -17,7 +17,7 @@ import { el, cssEscape } from './util.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-const ROW_HEIGHT = 48; // px per commit row (fits subject + meta lines)
+const ROW_HEIGHT = 64; // px per commit row (fits subject + meta + stats lines)
 const LANE_WIDTH = 16; // px horizontal spacing between lanes
 const NODE_RADIUS = 4; // px
 const STROKE_WIDTH = 2; // px
@@ -343,7 +343,67 @@ function buildInfo(commit, showRefs) {
   }
   info.appendChild(meta);
 
+  const stats = buildStats(commit.stats);
+  if (stats) info.appendChild(stats);
+
   return info;
+}
+
+/* Compact per-commit change summary: line +/- and file A/M/D counts.
+ * Returns null when there are no stats to show (e.g. merge commits). */
+function buildStats(s) {
+  if (!s) return null;
+  const linesAdded = s.linesAdded || 0;
+  const linesRemoved = s.linesRemoved || 0;
+  const filesAdded = s.filesAdded || 0;
+  const filesModified = s.filesModified || 0;
+  const filesRemoved = s.filesRemoved || 0;
+
+  if (
+    linesAdded === 0 && linesRemoved === 0 &&
+    filesAdded === 0 && filesModified === 0 && filesRemoved === 0
+  ) {
+    return null;
+  }
+
+  const wrap = el('div', { className: 'graph-stats' });
+
+  if (linesAdded > 0 || linesRemoved > 0) {
+    const lines = el('span', { className: 'graph-stat-lines' });
+    if (linesAdded > 0) {
+      lines.appendChild(el('span', { className: 'graph-stat-add', text: '+' + linesAdded }));
+    }
+    if (linesRemoved > 0) {
+      lines.appendChild(el('span', { className: 'graph-stat-del', text: '−' + linesRemoved }));
+    }
+    wrap.appendChild(lines);
+  }
+
+  const fileTokens = [];
+  if (filesAdded > 0) fileTokens.push(['A', filesAdded, 'A']);
+  if (filesModified > 0) fileTokens.push(['M', filesModified, 'M']);
+  if (filesRemoved > 0) fileTokens.push(['D', filesRemoved, 'D']);
+
+  if (fileTokens.length > 0) {
+    const files = el('span', { className: 'graph-stat-files' });
+    const totalFiles = filesAdded + filesModified + filesRemoved;
+    files.setAttribute(
+      'title',
+      `${totalFiles} file${totalFiles === 1 ? '' : 's'} changed` +
+        (filesAdded ? ` · ${filesAdded} added` : '') +
+        (filesModified ? ` · ${filesModified} modified` : '') +
+        (filesRemoved ? ` · ${filesRemoved} removed` : '')
+    );
+    for (const [code, count] of fileTokens) {
+      const tok = el('span', { className: 'graph-fstat graph-fstat-' + code });
+      tok.appendChild(el('span', { className: 'graph-fstat-n', text: String(count) }));
+      tok.appendChild(el('span', { className: 'graph-fstat-c', text: code }));
+      files.appendChild(tok);
+    }
+    wrap.appendChild(files);
+  }
+
+  return wrap;
 }
 
 /**

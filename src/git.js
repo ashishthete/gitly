@@ -215,20 +215,16 @@ export async function getGraph(
   const fields = ['%H', '%h', '%P', '%an', '%ar', '%aI', '%s', '%D'].join('%x1f');
   const format = `${fields}%x1e`;
 
-  const args = [
-    'log',
-    '--topo-order',
-    `--skip=${skip}`,
-    `--max-count=${limit}`,
-    `--format=${format}`,
-  ];
+  // Shared revision selection so the stats passes cover the exact same commits.
+  const revArgs = ['--topo-order', `--skip=${skip}`, `--max-count=${limit}`];
   if (all) {
-    args.push('--all');
+    revArgs.push('--all');
   } else {
-    args.push(branch && branch.length ? branch : 'HEAD');
+    revArgs.push(branch && branch.length ? branch : 'HEAD');
   }
 
-  const stdout = await run(repoRoot, args);
+  const stdout = await run(repoRoot, ['log', ...revArgs, `--format=${format}`]);
+  const stats = await collectGraphStats(repoRoot, revArgs);
 
   const commits = [];
   for (const record of stdout.split(RS)) {
@@ -243,6 +239,7 @@ export async function getGraph(
       .split(', ')
       .map((r) => r.trim())
       .filter((r) => r.length > 0);
+    const s = stats.get(sha) || emptyStats();
     commits.push({
       sha,
       shortSha,
@@ -252,10 +249,76 @@ export async function getGraph(
       dateIso,
       subject,
       refs,
+      stats: s,
     });
   }
 
   return commits;
+}
+
+function emptyStats() {
+  return {
+    linesAdded: 0,
+    linesRemoved: 0,
+    filesAdded: 0,
+    filesModified: 0,
+    filesRemoved: 0,
+  };
+}
+
+/**
+ * Per-commit change stats (line +/- and file add/modify/remove counts) for a
+ * set of revisions. Two cheap `git log` passes keyed by SHA: `--numstat` for
+ * line counts, `--name-status` for the file-status breakdown. Merge commits
+ * carry no diff under plain `git log`, so they report zeros (matching the
+ * single-commit detail view, which is --first-parent based).
+ * @returns {Promise<Map<string, ReturnType<typeof emptyStats>>>}
+ */
+async function collectGraphStats(repoRoot, revArgs) {
+  const stats = new Map();
+  const ensure = (sha) => {
+    let s = stats.get(sha);
+    if (!s) {
+      s = emptyStats();
+      stats.set(sha, s);
+    }
+    return s;
+  };
+
+  // Line counts. Each commit block begins with a "\x1e<sha>" marker line.
+  const numOut = await run(repoRoot, ['log', ...revArgs, `--format=${RS}%H`, '--numstat']);
+  let cur = null;
+  for (const line of numOut.split('\n')) {
+    if (line.startsWith(RS)) {
+      cur = ensure(line.slice(1));
+      continue;
+    }
+    if (!cur || !line.trim()) continue;
+    const cols = line.split('\t');
+    if (cols.length < 3) continue;
+    // Binary files report '-' for both counts.
+    const add = cols[0] === '-' ? 0 : parseInt(cols[0], 10) || 0;
+    const del = cols[1] === '-' ? 0 : parseInt(cols[1], 10) || 0;
+    cur.linesAdded += add;
+    cur.linesRemoved += del;
+  }
+
+  // File-status breakdown.
+  const nameOut = await run(repoRoot, ['log', ...revArgs, `--format=${RS}%H`, '--name-status']);
+  cur = null;
+  for (const line of nameOut.split('\n')) {
+    if (line.startsWith(RS)) {
+      cur = ensure(line.slice(1));
+      continue;
+    }
+    if (!cur || !line.trim()) continue;
+    const code = line[0];
+    if (code === 'A' || code === 'C') cur.filesAdded++;
+    else if (code === 'D') cur.filesRemoved++;
+    else cur.filesModified++; // M, R (rename), T (type change), etc.
+  }
+
+  return stats;
 }
 
 /**
