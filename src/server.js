@@ -60,6 +60,12 @@ export async function startServer({ repoRoot, port }) {
         return;
       }
 
+      // API: repo info
+      if (pathname === '/api/repo') {
+        sendJson(res, 200, { name: path.basename(repoRoot), path: repoRoot });
+        return;
+      }
+
       // API: branches
       if (pathname === '/api/branches') {
         const branches = await getBranches(repoRoot);

@@ -94,6 +94,32 @@ body {
   background: var(--accent);
 }
 
+/* Repo name + path, right-aligned in the tab bar */
+.repo-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 16px;
+  min-width: 0;
+}
+.repo-info[hidden] { display: none; }
+.repo-name {
+  flex: 0 0 auto;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+}
+.repo-path {
+  flex: 0 1 auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- Tab panels ----------------------------------------------------------- */
 
 .tab-panels {

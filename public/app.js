@@ -564,6 +564,27 @@ function startResize(e, splitter) {
 if (errorDismissEl) errorDismissEl.addEventListener('click', clearError);
 
 initResizers();
+loadRepoInfo();
 
 // History is the default tab; load its branches immediately.
 loadBranches();
+
+async function loadRepoInfo() {
+  let info;
+  try {
+    info = await fetchJson('/api/repo');
+  } catch {
+    return; // non-critical; leave the header as-is
+  }
+  if (!info || !info.name) return;
+  const wrap = document.getElementById('repo-info');
+  const nameEl = document.getElementById('repo-name');
+  const pathEl = document.getElementById('repo-path');
+  if (nameEl) nameEl.textContent = info.name;
+  if (pathEl && info.path) {
+    pathEl.textContent = info.path;
+    pathEl.title = info.path;
+  }
+  document.title = 'gitly — ' + info.name;
+  if (wrap) wrap.hidden = false;
+}
