@@ -17,7 +17,7 @@
  *   mountRepoTree(rootEl, opts = {})
  * -------------------------------------------------------------------------- */
 
-import { el, setPlaceholder, fetchJson, showError, clearError } from './util.js';
+import { el, setPlaceholder, fetchJson, showError, clearError, renderCodeWithGutter } from './util.js';
 import { renderTreeChart } from './treechart.js';
 
 /**
@@ -167,28 +167,8 @@ export function mountRepoTree(rootEl, opts = {}) {
       return;
     }
 
-    viewerInner.append(renderCode(data.content == null ? '' : String(data.content)));
+    viewerInner.append(renderCodeWithGutter(data.content));
     viewer.replaceChildren(viewerInner);
-  }
-
-  // Line-number gutter beside the content. The gutter holds one number per
-  // line; the code column holds the matching lines.
-  function renderCode(content) {
-    const code = el('div', { className: 'fileview-code' });
-    const gutter = el('div', { className: 'fileview-gutter' });
-    const lines = el('div', { className: 'fileview-lines' });
-
-    const rows = content.split('\n');
-    if (rows.length > 1 && rows[rows.length - 1] === '') rows.pop();
-
-    rows.forEach((lineText, i) => {
-      gutter.append(el('span', { className: 'fileview-lineno', text: String(i + 1) }));
-      // textContent keeps content safe and whitespace preserved (CSS pre).
-      lines.append(el('span', { className: 'fileview-line', text: lineText }));
-    });
-
-    code.append(gutter, lines);
-    return code;
   }
 
   function formatSize(bytes) {

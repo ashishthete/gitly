@@ -32,6 +32,31 @@ export function setPlaceholder(container, text) {
   container.replaceChildren(el('div', { className: 'placeholder', text }));
 }
 
+/**
+ * Render text content as a two-column code block: a line-number gutter beside
+ * the lines. Whitespace is preserved via CSS (`white-space: pre`) and content
+ * is inserted as textContent, so it is XSS-safe. Shared by the Repo Tree file
+ * viewer and the commit-detail "full file" view.
+ * @param {string} content
+ * @returns {HTMLElement} a `.fileview-code` element
+ */
+export function renderCodeWithGutter(content) {
+  const code = el('div', { className: 'fileview-code' });
+  const gutter = el('div', { className: 'fileview-gutter' });
+  const lines = el('div', { className: 'fileview-lines' });
+
+  const rows = String(content == null ? '' : content).split('\n');
+  if (rows.length > 1 && rows[rows.length - 1] === '') rows.pop();
+
+  rows.forEach((lineText, i) => {
+    gutter.append(el('span', { className: 'fileview-lineno', text: String(i + 1) }));
+    lines.append(el('span', { className: 'fileview-line', text: lineText }));
+  });
+
+  code.append(gutter, lines);
+  return code;
+}
+
 /** Minimal CSS attribute-value escaper for querySelector. */
 export function cssEscape(value) {
   return String(value).replace(/["\\]/g, '\\$&');

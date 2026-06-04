@@ -16,6 +16,7 @@ import {
   fetchJson,
   showError,
   clearError,
+  renderCodeWithGutter,
 } from './util.js';
 import { renderCommitGraph, highlightCommit } from './graph.js';
 import { mountRepoTree } from './tree.js';
@@ -410,7 +411,7 @@ function renderDetail(detail, detailEl) {
     frag.appendChild(renderFilesToolbar(files.length, detailEl));
     const list = el('div', { className: 'file-list' });
     for (const file of files) {
-      list.appendChild(renderFile(file));
+      list.appendChild(renderFile(file, detail.sha));
     }
     frag.appendChild(list);
   }
@@ -456,7 +457,7 @@ function metaRow(label, value, mono) {
 
 const STATUS_LABELS = { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed' };
 
-function renderFile(file) {
+function renderFile(file, sha) {
   const block = el('div', { className: 'file-block collapsed' });
 
   const head = el('button', {
@@ -478,18 +479,116 @@ function renderFile(file) {
   block.appendChild(head);
 
   const body = el('div', { className: 'file-body' });
+
+  // Diff content (rendered once, always available).
+  const diffPane = el('div', { className: 'file-pane file-pane-diff' });
   if (file.binary === true) {
-    body.appendChild(el('div', { className: 'binary-note', text: 'binary file (no diff)' }));
+    diffPane.appendChild(el('div', { className: 'binary-note', text: 'binary file (no diff)' }));
   } else {
     const diffText = typeof file.diff === 'string' ? file.diff : '';
     if (diffText === '') {
-      body.appendChild(el('div', { className: 'binary-note', text: 'no diff' }));
+      diffPane.appendChild(el('div', { className: 'binary-note', text: 'no diff' }));
     } else {
-      body.appendChild(renderDiff(diffText));
+      diffPane.appendChild(renderDiff(diffText));
     }
   }
+
+  // Full-content pane (lazy-loaded the first time "Full" is selected).
+  const fullPane = el('div', { className: 'file-pane file-pane-full', attrs: { hidden: '' } });
+  let fullLoaded = false;
+
+  const toggle = renderFileViewToggle((mode) => {
+    const showFull = mode === 'full';
+    diffPane.hidden = showFull;
+    fullPane.hidden = !showFull;
+    if (showFull && !fullLoaded) {
+      fullLoaded = true;
+      loadFullFile(file, sha, fullPane);
+    }
+  });
+
+  body.appendChild(toggle);
+  body.appendChild(diffPane);
+  body.appendChild(fullPane);
   block.appendChild(body);
   return block;
+}
+
+/**
+ * Segmented Diff | Full control. Calls `onChange('diff'|'full')` on switch.
+ * Returns the control element.
+ */
+function renderFileViewToggle(onChange) {
+  const bar = el('div', { className: 'file-view-toggle', attrs: { role: 'tablist' } });
+  const diffBtn = el('button', {
+    className: 'file-view-btn active',
+    text: 'Diff',
+    attrs: { type: 'button', 'aria-selected': 'true' },
+  });
+  const fullBtn = el('button', {
+    className: 'file-view-btn',
+    text: 'Full',
+    attrs: { type: 'button', 'aria-selected': 'false' },
+  });
+
+  const select = (mode) => {
+    const full = mode === 'full';
+    fullBtn.classList.toggle('active', full);
+    diffBtn.classList.toggle('active', !full);
+    fullBtn.setAttribute('aria-selected', String(full));
+    diffBtn.setAttribute('aria-selected', String(!full));
+    onChange(mode);
+  };
+
+  diffBtn.addEventListener('click', () => select('diff'));
+  fullBtn.addEventListener('click', () => select('full'));
+
+  bar.appendChild(diffBtn);
+  bar.appendChild(fullBtn);
+  return bar;
+}
+
+/**
+ * Fetch and render a file's full content at the commit. Deleted files no longer
+ * exist at the commit ref, so fall back to the parent (`<sha>^`).
+ */
+async function loadFullFile(file, sha, pane) {
+  pane.replaceChildren(el('div', { className: 'placeholder', text: 'Loading…' }));
+
+  const deleted = (file.status || '').toUpperCase().charAt(0) === 'D';
+  const ref = deleted ? sha + '^' : sha;
+
+  let data;
+  try {
+    data = await fetchJson(
+      '/api/file?ref=' + encodeURIComponent(ref) + '&path=' + encodeURIComponent(file.path)
+    );
+  } catch (err) {
+    pane.replaceChildren(
+      el('div', { className: 'binary-note', text: 'Could not load file: ' + err.message })
+    );
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+
+  if (deleted) {
+    frag.appendChild(el('div', {
+      className: 'fileview-note',
+      text: '(content at parent commit — file deleted in this commit)',
+    }));
+  }
+  if (data && data.truncated) {
+    frag.appendChild(el('div', { className: 'fileview-note', text: '(truncated)' }));
+  }
+
+  if (data && data.binary) {
+    frag.appendChild(el('div', { className: 'binary-note', text: 'binary file — not shown' }));
+  } else {
+    frag.appendChild(renderCodeWithGutter(data ? data.content : ''));
+  }
+
+  pane.replaceChildren(frag);
 }
 
 function renderDiff(diffText) {

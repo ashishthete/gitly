@@ -431,6 +431,32 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .files-toggle-all:hover { background: var(--bg-hover); color: var(--text); }
 
+/* Per-file Diff | Full segmented control (top of an expanded file body). */
+.file-view-toggle {
+  display: inline-flex;
+  gap: 0;
+  margin: 8px 18px 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+.file-view-btn {
+  border: 0;
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 11px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.file-view-btn + .file-view-btn { border-left: 1px solid var(--border-strong); }
+.file-view-btn:hover { background: var(--bg-hover); color: var(--text); }
+.file-view-btn.active {
+  background: var(--accent, #1f6feb);
+  color: #fff;
+}
+
 .file-block {
   margin: 0;
   border-bottom: 1px solid var(--border);
